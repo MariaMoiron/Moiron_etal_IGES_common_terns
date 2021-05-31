@@ -1,10 +1,10 @@
-# Code for "Understanding the social dynamics of breeding phenology: indirect genetic effects and assortative mating"
+# Code for "Understanding the Social Dynamics of Breeding Phenology: Indirect Genetic Effects and Assortative Mating in a Long-Distance Migrant"
 # [doi: 10.1086/711045]
 # Moiron M, Araya-Ajoy YG, Teplitsky C, Bouwhuis S, Charmantier A   
 
 # The code provided here is sufficient to replicate the simulations presented in the above paper. 
 # If you are interested in running the same or additional simulations, and need help
-# feel free to get in touch with at least one (preferably both) of the following researchers:
+# feel free to get in touch with the following researchers:
 #  - Dr Maria Moiron (CEFE-CNRS, Montpellier): mariamoironc<at>gmail.com
 #  - Dr Yimen Araya-Ajoy (Norwegian University of Science and Technology, Trondheim): yimencr<at>gmail.com 
 
@@ -17,7 +17,7 @@
 
 
 ######################################################
-# DATA SIMULATIONs
+# DATA SIMULATIONS
 ######################################################
 
 # Load R-packages
@@ -57,7 +57,7 @@ for(i in 1:batch){
   asmaB1 <- (asma*sqrt(Vaf*Vam))/Vaf #we converted the correlation to a slope to reflect that assortative mating is caused by mate choice. 
   asmaB2 <- (asma*sqrt(Vaf*Vam))/Vam #we converted the correlation to a slope to reflect that assortative mating is caused by mate choice. 
   
-  ##Initial generation
+  ##Initial year
   af<-rnorm(n.ind, 0, sqrt(Vaf)) #individual BLUP of female (equivalent of breeding value but at individual level)
   am<-af*asmaB1 + rnorm(n.ind, 0, sqrt(Vam-asmaB1^2)) #individual BLUP of male (equivalent of breeding value but at individual level)
   
@@ -70,12 +70,11 @@ for(i in 1:batch){
   for(a in 2:n.years){
     
     ##################################################
-  ##Next generations
-      s<-sample(1:n.ind, n.ind/2) #half of the population survive and re-mate with the same partner in the next year
+  ##Next years
+     s<-sample(1:n.ind, n.ind/2) #half of the population survive and re-mate with the same partner in the next year
     dftmp1<-df[s,] #select surviving pairs that mate with the same partner
     dftmp1$zm<-dftmp1$am + rnorm(nrow(dftmp1), 0, sqrt(Vrm)) #male phenotype include unexplained environmental variation for that year
     dftmp1$zf<- dftmp1$af + dftmp1$am*psi + rnorm(nrow(dftmp1), 0, sqrt(Vrf)) #female phenotype include unexplained environmental variation for that year
-    
     
     dftmp2<-df[-s,] #rest of the population that either do not survive or that survive but do not re-mate with the same partner in the next year
     
@@ -84,8 +83,7 @@ for(i in 1:batch){
     zmtmp1<-amtmp1 + rnorm(length(amtmp1), 0, sqrt(Vrm)) #phenotypic values of divorced males in the next year
     aftmp2<-amtmp1*asmaB2 + rnorm(length(amtmp1), 0, sqrt(Vaf-asmaB2^2)) #individual BLUPS of their new female mates, based on mate choice generating assortative mating
     zftmp2<- aftmp2 + amtmp1*psi + rnorm(length(amtmp1), 0, sqrt(Vrf)) #phenotypic values of their new female mates
-    
-    
+      
     Femaletmp<-sample(dftmp2$femaleId, nrow(dftmp2)/2) #half of the surviving females mate with a different partner in the next year
     aftmp1<-df$af[match(Femaletmp, df$femaleId)] #individual BLUPS of divorced females in the next year
     amtmp2<-aftmp1*asmaB1 + rnorm(length(amtmp1), 0, sqrt(Vam-asmaB1^2)) #individual BLUPS of their new male mates, based on mate choice rather than assortative mating
@@ -103,12 +101,13 @@ for(i in 1:batch){
   
   #We fit the simulated data to the statistical model
   
-  #Prior inverse gamma
+  #Set prior
   priorA <- list(G = list(G1 = list(V = 1, nu = 0.002, alpha.mu=0, alpha.V=diag(1)*1000),
                           G2 = list(V = 1, nu = 0.002, alpha.mu=0, alpha.V=diag(1)*1000),
                           G3 = list(V = 1, nu = 0.002, alpha.mu=0, alpha.V=diag(1)*1000)),
                  R=list(V=1, nu=0.002))
-  #Set model
+ 
+  #Set model and retrive results over loops
   mod<-MCMCglmm(zf~ 1,
                 random=~maleId+femaleId+year,
                 data=data,
@@ -125,15 +124,3 @@ for(i in 1:batch){
   simres$results[[i]]<-results
   
 }
-
-d <- data.frame(row = c(1:batch))
-d$col2 <- simres$results
-d$combination <- rep(1:n.sim, each=nrow(par))
-d=as.data.frame(unnest(d, col2))
-
-
-#save(d, file = "simulations.xlsx")
-#load("simulations.xlsx")
-
-d$varMbyAsMa=(d$asma^2)*d$varM #male effects caused by assortative mating
-d$varMbyPsi=(d$psi^2)*d$varM #male effects caused by psi
